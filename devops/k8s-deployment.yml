@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: amdox-erp
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amdox-config
+  namespace: amdox-erp
+data:
+  DATABASE_URL: "postgresql://amdox_admin:amdox_password@postgres-service:5432/amdox_erp?schema=public"
+  REDIS_URL: "redis://redis-service:6379"
+  AI_SERVICE_URL: "http://ai-service:8000"
+
+---
+# PostgreSQL Workload
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deploy
+  namespace: amdox-erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: timescale/timescaledb:latest-pg15
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "amdox_admin"
+        - name: POSTGRES_PASSWORD
+          value: "amdox_password"
+        - name: POSTGRES_DB
+          value: "amdox_erp"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: amdox-erp
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: postgres
+
+---
+# Redis Workload
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deploy
+  namespace: amdox-erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: amdox-erp
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis
+
+---
+# FastAPI AI Service Workload
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-deploy
+  namespace: amdox-erp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+    spec:
+      containers:
+      - name: ai-service
+        image: amdox-ai-service:latest
+        ports:
+        - containerPort: 8000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: amdox-erp
+spec:
+  ports:
+  - port: 8000
+  selector:
+    app: ai-service
+
+---
+# NestJS Backend Workload
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deploy
+  namespace: amdox-erp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: amdox-backend:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: amdox-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: amdox-erp
+spec:
+  ports:
+  - port: 3000
+  selector:
+    app: backend
+
+---
+# Next.js Frontend Workload
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deploy
+  namespace: amdox-erp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: amdox-frontend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://backend-service:3000"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: amdox-erp
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    app: frontend

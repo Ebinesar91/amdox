@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: amdox_postgres
+    environment:
+      POSTGRES_USER: amdox_admin
+      POSTGRES_PASSWORD: amdox_password
+      POSTGRES_DB: amdox_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amdox_admin -d amdox_erp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - amdox-network
+
+  redis:
+    image: redis:alpine
+    container_name: amdox_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - amdox-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: amdox_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - amdox-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.1
+    container_name: amdox_keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - amdox-network
+
+volumes:
+  pgdata:
+  redisdata:
+  esdata:
+
+networks:
+  amdox-network:
+    driver: bridge

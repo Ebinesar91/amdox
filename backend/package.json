@@ -1,0 +1,51 @@
+{
+  "name": "amdox-erp-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.9.5",
+    "@nestjs/apollo": "^12.0.11",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^3.1.1",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/graphql": "^12.0.11",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/passport": "^10.0.3",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^8.0.0",
+    "@prisma/client": "^5.7.0",
+    "apollo-server-express": "^3.13.0",
+    "bullmq": "^5.1.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.0",
+    "graphql": "^16.8.1",
+    "ioredis": "^5.3.2",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.2.1",
+    "@nestjs/schematics": "^10.0.3",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.4",
+    "@types/passport-jwt": "^4.0.0",
+    "prisma": "^5.7.0",
+    "typescript": "^5.3.3"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

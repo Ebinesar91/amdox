@@ -1,0 +1,401 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// Core Tenant & Organization
+// ==========================================
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  domain      String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  organizations Organization[]
+  users         User[]
+  accounts      Account[]
+  employees     Employee[]
+  vendors       Vendor[]
+  warehouses    Warehouse[]
+  projects      Project[]
+  dashboards    Dashboard[]
+  auditLogs     AuditLog[]
+  invoices      Invoice[]
+  purchaseOrders PurchaseOrder[]
+  payslips      Payslip[]
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  employees   Employee[]
+  projects    Project[]
+}
+
+// ==========================================
+// Authentication, Roles & Permissions (RBAC)
+// ==========================================
+
+model User {
+  id          String   @id @default(uuid())
+  tenantId    String
+  email       String   @unique
+  name        String
+  role        String   // SUPER_ADMIN, TENANT_ADMIN, HR_MANAGER, FINANCE_MANAGER, INVENTORY_MANAGER, PROJECT_MANAGER, EMPLOYEE, VIEWER
+  keycloakId  String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// ==========================================
+// Audit Logs (Immutable Auditing)
+// ==========================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  action      String
+  entity      String
+  entityId    String
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// ==========================================
+// Finance Module (General Ledger)
+// ==========================================
+
+model Account {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String   @unique // e.g., 10100 (Cash), 40100 (Revenue)
+  name        String
+  type        String   // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  balance     Decimal  @default(0.0) @db.Decimal(18, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  journalLines JournalLine[]
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid())
+  tenantId    String
+  reference   String
+  description String?
+  postedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  lines       JournalLine[]
+}
+
+model JournalLine {
+  id             String   @id @default(uuid())
+  journalEntryId String
+  accountId      String
+  debit          Decimal  @default(0.0) @db.Decimal(18, 4)
+  credit         Decimal  @default(0.0) @db.Decimal(18, 4)
+
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id])
+}
+
+model Invoice {
+  id          String   @id @default(uuid())
+  tenantId    String
+  type        String   // AP (Vendor Bill), AR (Customer Invoice)
+  invoiceNo   String   @unique
+  customerId  String?
+  vendorId    String?
+  amount      Decimal  @db.Decimal(18, 4)
+  taxAmount   Decimal  @default(0.0) @db.Decimal(18, 4)
+  status      String   // UNPAID, PAID, OVERDUE, DRAFT
+  dueDate     DateTime
+  issuedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  vendor      Vendor?  @relation(fields: [vendorId], references: [id])
+}
+
+// ==========================================
+// HR & Payroll Module
+// ==========================================
+
+model Employee {
+  id             String   @id @default(uuid())
+  tenantId       String
+  organizationId String
+  firstName      String
+  lastName       String
+  email          String   @unique
+  department     String
+  designation    String
+  reportingTo    String?
+  salary         Decimal  @db.Decimal(18, 4)
+  joinedAt       DateTime
+  status         String   // ACTIVE, INACTIVE, SUSPENDED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  leaveRequests  LeaveRequest[]
+  attendanceLogs Attendance[]
+  payslips       Payslip[]
+}
+
+model LeaveRequest {
+  id          String   @id @default(uuid())
+  employeeId  String
+  type        String   // SICK, CASUAL, ANNUAL, MATERNITY
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  status      String   // PENDING, APPROVED, REJECTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  employeeId  String
+  clockIn     DateTime
+  clockOut    DateTime?
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now())
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Payslip {
+  id          String   @id @default(uuid())
+  tenantId    String
+  employeeId  String
+  periodStart DateTime
+  periodEnd   DateTime
+  baseSalary  Decimal  @db.Decimal(18, 4)
+  bonus       Decimal  @default(0.0) @db.Decimal(18, 4)
+  deductions  Decimal  @default(0.0) @db.Decimal(18, 4)
+  netSalary   Decimal  @db.Decimal(18, 4)
+  status      String   // DRAFT, APPROVED, PAID
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Supply Chain Module (SCM)
+// ==========================================
+
+model Vendor {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  email       String
+  phone       String?
+  rating      Float    @default(5.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  invoices    Invoice[]
+  purchaseOrders PurchaseOrder[]
+}
+
+model Warehouse {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  location    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  stocks      Stock[]
+}
+
+model Item {
+  id          String   @id @default(uuid())
+  sku         String   @unique
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(18, 4)
+  reorderLevel Int     @default(10)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stocks      Stock[]
+  transactions StockTransaction[]
+}
+
+model Stock {
+  id          String   @id @default(uuid())
+  warehouseId String
+  itemId      String
+  quantity    Int      @default(0)
+
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, itemId])
+}
+
+model StockTransaction {
+  id          String   @id @default(uuid())
+  itemId      String
+  type        String   // STOCK_IN, STOCK_OUT, ADJUSTMENT
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  reference   String?  // e.g. PO number
+  createdAt   DateTime @default(now())
+
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model PurchaseOrder {
+  id          String   @id @default(uuid())
+  tenantId    String
+  poNumber    String   @unique
+  vendorId    String
+  totalAmount Decimal  @db.Decimal(18, 4)
+  status      String   // DRAFT, SENT, RECEIVED, CANCELLED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+}
+
+// ==========================================
+// Project Management Module
+// ==========================================
+
+model Project {
+  id             String   @id @default(uuid())
+  tenantId       String
+  organizationId String
+  name           String
+  description    String?
+  budget         Decimal  @db.Decimal(18, 4)
+  startDate      DateTime
+  endDate        DateTime
+  status         String   // PLANNING, ACTIVE, COMPLETED, ON_HOLD
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  tasks          Task[]
+  milestones     Milestone[]
+  allocations    ResourceAllocation[]
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  description String?
+  assigneeId  String?
+  status      String   // TODO, IN_PROGRESS, REVIEW, DONE
+  priority    String   // LOW, MEDIUM, HIGH, CRITICAL
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Milestone {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  dueDate     DateTime
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ResourceAllocation {
+  id          String   @id @default(uuid())
+  projectId   String
+  userId      String   // Employee User ID
+  role        String   // Developer, PM, QA, etc.
+  utilization Float    // Percentage, e.g. 50.0 for half time
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime @default(now())
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// BI Dashboard Builder Module
+// ==========================================
+
+model Dashboard {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  widgets     Widget[]
+}
+
+model Widget {
+  id          String   @id @default(uuid())
+  dashboardId String
+  title       String
+  type        String   // KPI_CARD, TABLE, BAR_CHART, LINE_CHART, PIE_CHART, FORECAST
+  x           Int      @default(0)
+  y           Int      @default(0)
+  w           Int      @default(3)
+  h           Int      @default(3)
+  queryConfig Json     // Configurations to fetch and format widget data
+
+  dashboard   Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+}
