@@ -76,10 +76,14 @@ export default function GeneralLedgerPage() {
             <Plus className="w-4 h-4" />
             <span>New Entry</span>
           </button>
-          <button className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-sm hover:bg-white/10 transition-all">
+          <a 
+            href="http://localhost:3000/api/finance/ledger/export" 
+            download="general_ledger_export.csv"
+            className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-sm hover:bg-white/10 transition-all"
+          >
             <Download className="w-4 h-4" />
             <span>Export CSV</span>
-          </button>
+          </a>
         </div>
       </div>
 

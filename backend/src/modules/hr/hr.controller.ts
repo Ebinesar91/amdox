@@ -137,4 +137,14 @@ export class HRController {
     }
     return generatedPayslips;
   }
+
+  @Get('payroll')
+  @ApiOperation({ summary: 'List all processed payslips' })
+  async getPayslips(@GetTenantId() tenantId: string) {
+    return this.prisma.payslip.findMany({
+      where: { tenantId },
+      include: { employee: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

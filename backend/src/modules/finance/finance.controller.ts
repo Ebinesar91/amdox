@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
+import { Response } from 'express';
 import { PrismaService } from '../../common/prisma.service';
 import { GetTenantId } from '../../common/tenant.context';
 
@@ -116,5 +117,61 @@ export class FinanceController {
         vendorId: body.vendorId,
       },
     });
+  }
+
+  @Get('ledger/export')
+  @ApiOperation({ summary: 'Export General Ledger as CSV' })
+  async exportLedger(@GetTenantId() tenantId: string, @Res() res: Response) {
+    const accounts = await this.prisma.account.findMany({
+      where: { tenantId, deletedAt: null },
+      orderBy: { code: 'asc' },
+    });
+
+    let csvContent = 'Account Code,Account Name,Type,Balance,Created At\n';
+    for (const acc of accounts) {
+      csvContent += `"${acc.code}","${acc.name}","${acc.type}",${acc.balance},"${acc.createdAt.toISOString()}"\n`;
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=general_ledger_export.csv');
+    return res.status(200).send(csvContent);
+  }
+
+  @Get('invoices/export')
+  @ApiOperation({ summary: 'Export Invoices as CSV' })
+  async exportInvoices(@GetTenantId() tenantId: string, @Res() res: Response) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: { tenantId, deletedAt: null },
+      orderBy: { issuedAt: 'desc' },
+    });
+
+    let csvContent = 'Invoice No,Type,Amount,Tax Amount,Status,Due Date,Issued At\n';
+    for (const inv of invoices) {
+      csvContent += `"${inv.invoiceNo}","${inv.type}",${inv.amount},${inv.taxAmount},"${inv.status}","${inv.dueDate.toISOString()}","${inv.issuedAt.toISOString()}"\n`;
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=invoices_export.csv');
+    return res.status(200).send(csvContent);
+  }
+
+  @Get('payroll/export')
+  @ApiOperation({ summary: 'Export Payroll Runs as CSV' })
+  async exportPayroll(@GetTenantId() tenantId: string, @Res() res: Response) {
+    const payslips = await this.prisma.payslip.findMany({
+      where: { tenantId },
+      include: { employee: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let csvContent = 'Employee,Period Start,Period End,Base Salary,Deductions,Net Salary,Status,Processed At\n';
+    for (const slip of payslips) {
+      const name = `${slip.employee.firstName} ${slip.employee.lastName}`;
+      csvContent += `"${name}","${slip.periodStart.toISOString()}","${slip.periodEnd.toISOString()}",${slip.baseSalary},${slip.deductions},${slip.netSalary},"${slip.status}","${slip.createdAt.toISOString()}"\n`;
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=payroll_export.csv');
+    return res.status(200).send(csvContent);
   }
 }
