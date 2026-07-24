@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: amdox_ai_backend
+    ports:
+      - "8050:8050"
+    environment:
+      - LLM_PROVIDER=openai
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ERP_API_BASE_URL=http://localhost:3000/api
+    networks:
+      - amdox-ai-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: amdox_ai_frontend
+    ports:
+      - "3050:3050"
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8050
+    depends_on:
+      - backend
+    networks:
+      - amdox-ai-network
+
+networks:
+  amdox-ai-network:
+    driver: bridge

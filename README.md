@@ -139,7 +139,7 @@ npm run dev
 
 ### 5. Run the Python AI Engine
 ```bash
-cd ../ai-service
+cd ai-service
 pip install -r requirements.txt
 python app/main.py
 ```
@@ -147,7 +147,7 @@ python app/main.py
 
 ### 6. Run the Next.js Frontend
 ```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 ```
@@ -156,7 +156,7 @@ npm run dev
 ### 7. Run the Standalone AI Assistant
 The AI Assistant operates as an isolated, distinct ecosystem integrating with ERP APIs.
 ```bash
-cd ../amdox-ai-assistant
+cd amdox-ai-assistant
 docker-compose up -d --build
 ```
 *Access the separate conversational assistant interface at `http://localhost:3050`.*
